@@ -21,7 +21,18 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:minHeight="48dp"
+            android:gravity="center_vertical"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"
             android:textAppearance="@style/TextAppearance.AutoJump.Body" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_edit_condition"
+            style="@style/Widget.AutoJump.Button.Text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="修改" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_remove_condition"

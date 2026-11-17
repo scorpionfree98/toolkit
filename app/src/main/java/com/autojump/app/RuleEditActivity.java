@@ -260,8 +260,12 @@ public class RuleEditActivity extends AppCompatActivity {
             View item = LayoutInflater.from(this)
                     .inflate(R.layout.item_condition, conditionsContainer, false);
             TextView description = item.findViewById(R.id.tv_condition_desc);
+            Button edit = item.findViewById(R.id.btn_edit_condition);
             Button remove = item.findViewById(R.id.btn_remove_condition);
             description.setText(conditions.get(i).getDescription());
+            description.setContentDescription("修改条件：" + conditions.get(i).getDescription());
+            description.setOnClickListener(v -> editCondition(index));
+            edit.setOnClickListener(v -> editCondition(index));
             remove.setOnClickListener(v -> {
                 rule.getConditions().remove(index);
                 refreshConditions();
@@ -317,6 +321,21 @@ public class RuleEditActivity extends AppCompatActivity {
     }
 
     private void addTimeCondition() {
+        showTimeCondition(-1);
+    }
+
+    private void editCondition(int index) {
+        switch (rule.getConditions().get(index).getType()) {
+            case TIME: showTimeCondition(index); break;
+            case WIFI: showWifiCondition(index); break;
+            case BLUETOOTH: showBluetoothCondition(index); break;
+            case CHARGING: showChargingCondition(index); break;
+            case LOCATION: showLocationCondition(index); break;
+            default: showError(new IllegalArgumentException("不支持修改此条件"));
+        }
+    }
+
+    private void showTimeCondition(int index) {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_time_condition, null);
         CheckBox[] days = {
                 view.findViewById(R.id.cb_mon), view.findViewById(R.id.cb_tue),
@@ -328,66 +347,73 @@ public class RuleEditActivity extends AppCompatActivity {
         EditText startMinute = view.findViewById(R.id.et_start_min);
         EditText endHour = view.findViewById(R.id.et_end_hour);
         EditText endMinute = view.findViewById(R.id.et_end_min);
-        new AlertDialog.Builder(this)
-                .setTitle("添加时间段条件")
-                .setView(view)
-                .setPositiveButton("添加", (dialog, which) -> {
-                    try {
-                        ArrayList<Integer> selected = new ArrayList<>();
-                        for (int i = 0; i < days.length; i++) {
-                            if (days[i].isChecked()) selected.add(i + 1);
-                        }
-                        int[] selectedDays = selected.isEmpty() ? null : new int[selected.size()];
-                        if (selectedDays != null) {
-                            for (int i = 0; i < selected.size(); i++) selectedDays[i] = selected.get(i);
-                        }
-                        rule.getConditions().add(RuleCondition.time(selectedDays,
-                                integer(startHour, "开始小时"), integer(startMinute, "开始分钟"),
-                                integer(endHour, "结束小时"), integer(endMinute, "结束分钟")));
-                        refreshConditions();
-                    } catch (IllegalArgumentException error) {
-                        showError(error);
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+        if (index >= 0) {
+            RuleCondition original = rule.getConditions().get(index);
+            int[] selected = original.getDaysOfWeek();
+            if (selected != null) for (int day : selected) if (day >= 1 && day <= 7) days[day - 1].setChecked(true);
+            startHour.setText(String.valueOf(original.getStartHour()));
+            startMinute.setText(String.valueOf(original.getStartMinute()));
+            endHour.setText(String.valueOf(original.getEndHour()));
+            endMinute.setText(String.valueOf(original.getEndMinute()));
+        }
+        showConditionForm(index, "时间段条件", view, () -> {
+            ArrayList<Integer> selected = new ArrayList<>();
+            for (int i = 0; i < days.length; i++) {
+                if (days[i].isChecked()) selected.add(i + 1);
+            }
+            int[] selectedDays = selected.isEmpty() ? null : new int[selected.size()];
+            if (selectedDays != null) {
+                for (int i = 0; i < selected.size(); i++) selectedDays[i] = selected.get(i);
+            }
+            return RuleCondition.time(selectedDays,
+                    integer(startHour, "开始小时"), integer(startMinute, "开始分钟"),
+                    integer(endHour, "结束小时"), integer(endMinute, "结束分钟"));
+        });
     }
 
     private void addWifiCondition() {
+        showWifiCondition(-1);
+    }
+
+    private void showWifiCondition(int index) {
         EditText input = new EditText(this);
         input.setHint("输入 WiFi 名称（SSID）");
-        new AlertDialog.Builder(this)
-                .setTitle("添加 WiFi 条件")
-                .setView(input)
-                .setPositiveButton("添加", (dialog, which) -> addConditionSafely(
-                        () -> RuleCondition.wifi(input.getText().toString())))
-                .setNegativeButton("取消", null)
-                .show();
+        if (index >= 0) input.setText(rule.getConditions().get(index).getSsid());
+        showConditionForm(index, "WiFi 条件", input, () -> RuleCondition.wifi(input.getText().toString()));
     }
 
     private void addBluetoothCondition() {
+        showBluetoothCondition(-1);
+    }
+
+    private void showBluetoothCondition(int index) {
         EditText input = new EditText(this);
         input.setHint("输入蓝牙设备名称");
-        new AlertDialog.Builder(this)
-                .setTitle("添加蓝牙条件")
-                .setView(input)
-                .setPositiveButton("添加", (dialog, which) -> addConditionSafely(
-                        () -> RuleCondition.bluetooth(input.getText().toString())))
-                .setNegativeButton("取消", null)
-                .show();
+        if (index >= 0) input.setText(rule.getConditions().get(index).getDeviceName());
+        showConditionForm(index, "蓝牙条件", input, () -> RuleCondition.bluetooth(input.getText().toString()));
     }
 
     private void addChargingCondition() {
-        new AlertDialog.Builder(this)
-                .setTitle("充电状态")
-                .setItems(new String[]{"充电中", "未充电"}, (dialog, which) -> {
-                    rule.getConditions().add(RuleCondition.charging(which == 0));
-                    refreshConditions();
-                })
-                .show();
+        showChargingCondition(-1);
+    }
+
+    private void showChargingCondition(int index) {
+        android.widget.RadioGroup choices = new android.widget.RadioGroup(this);
+        android.widget.RadioButton charging = new android.widget.RadioButton(this);
+        charging.setId(View.generateViewId()); charging.setText("充电中"); choices.addView(charging);
+        android.widget.RadioButton notCharging = new android.widget.RadioButton(this);
+        notCharging.setId(View.generateViewId()); notCharging.setText("未充电"); choices.addView(notCharging);
+        choices.check(index < 0 || rule.getConditions().get(index).isShouldBeCharging()
+                ? charging.getId() : notCharging.getId());
+        showConditionForm(index, "充电状态条件", choices,
+                () -> RuleCondition.charging(choices.getCheckedRadioButtonId() == charging.getId()));
     }
 
     private void addLocationCondition() {
+        showLocationCondition(-1);
+    }
+
+    private void showLocationCondition(int index) {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_location_condition, null);
         EditText latitude = view.findViewById(R.id.et_latitude);
         EditText longitude = view.findViewById(R.id.et_longitude);
@@ -395,21 +421,16 @@ public class RuleEditActivity extends AppCompatActivity {
         EditText name = view.findViewById(R.id.et_place_name);
         Button current = view.findViewById(R.id.btn_use_current_location);
         current.setOnClickListener(v -> fillCurrentLocation(latitude, longitude));
-        new AlertDialog.Builder(this)
-                .setTitle("添加地理位置条件")
-                .setView(view)
-                .setPositiveButton("添加", (dialog, which) -> {
-                    try {
-                        rule.getConditions().add(RuleCondition.location(
-                                decimal(latitude, "纬度"), decimal(longitude, "经度"),
-                                integer(radius, "范围半径"), name.getText().toString()));
-                        refreshConditions();
-                    } catch (IllegalArgumentException error) {
-                        showError(error);
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+        if (index >= 0) {
+            RuleCondition original = rule.getConditions().get(index);
+            latitude.setText(Double.toString(original.getLatitude()));
+            longitude.setText(Double.toString(original.getLongitude()));
+            radius.setText(Integer.toString(original.getRadiusMeters()));
+            name.setText(original.getPlaceName());
+        }
+        showConditionForm(index, "地理位置条件", view,
+                () -> RuleCondition.location(decimal(latitude, "纬度"), decimal(longitude, "经度"),
+                        integer(radius, "范围半径"), name.getText().toString()));
     }
 
     private void fillCurrentLocation(EditText latitude, EditText longitude) {
@@ -636,13 +657,23 @@ public class RuleEditActivity extends AppCompatActivity {
 
     private interface ConditionFactory { RuleCondition create(); }
 
-    private void addConditionSafely(ConditionFactory factory) {
-        try {
-            rule.getConditions().add(factory.create());
-            refreshConditions();
-        } catch (IllegalArgumentException error) {
-            showError(error);
-        }
+    private void showConditionForm(int index, String title, View form, ConditionFactory factory) {
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle((index < 0 ? "添加" : "修改") + title)
+                .setView(form)
+                .setPositiveButton(index < 0 ? "添加" : "保存修改", null)
+                .setNegativeButton("取消", null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            try {
+                com.autojump.app.domain.RuleConditionEdits.apply(rule.getConditions(), index, factory::create);
+                refreshConditions();
+                dialog.dismiss();
+            } catch (IllegalArgumentException error) {
+                // Keep the original form and entered values open for correction.
+                showError(error);
+            }
+        }));
+        dialog.show();
     }
 
     private int integer(EditText field, String label) {
