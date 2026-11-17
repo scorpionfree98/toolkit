@@ -80,6 +80,8 @@ public class RuleEditActivity extends AppCompatActivity {
         requestUnlock = findViewById(R.id.switch_request_unlock);
         menuShortcut = findViewById(R.id.switch_menu_shortcut);
         defaultInstruction = findViewById(R.id.switch_default_instruction);
+        // Retain the legacy preference without exposing a now-irrelevant launcher setting.
+        defaultInstruction.setVisibility(View.GONE);
         shortcutRank = findViewById(R.id.et_shortcut_rank);
         shortcutIcon = findViewById(R.id.btn_shortcut_icon);
         Button addCondition = findViewById(R.id.btn_add_condition);
@@ -122,7 +124,7 @@ public class RuleEditActivity extends AppCompatActivity {
         findViewById(R.id.btn_save_test).setOnClickListener(v -> {
             new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                     .setTitle("保存并实际运行")
-                    .setMessage("会打开目标页面并执行保存的操作，包括打卡点击。")
+                    .setMessage("本次忽略时间、Wi‑Fi 等匹配条件，打开目标页面并执行保存的操作，包括打卡点击。必要权限和系统解锁仍需满足。")
                     .setPositiveButton("保存并运行", (d, w) -> saveRule(true))
                     .setNegativeButton("取消", null).show();
         });
@@ -615,7 +617,7 @@ public class RuleEditActivity extends AppCompatActivity {
             com.autojump.app.util.ShortcutUtil.refreshDynamicShortcut(this);
             Toast.makeText(this, "指令已保存", Toast.LENGTH_SHORT).show();
             if (runNow) {
-                com.autojump.app.automation.AccessibilityAwareRuleRunner.enqueue(this, rule,
+                com.autojump.app.automation.AccessibilityAwareRuleRunner.enqueueManual(this, rule,
                         (queued, message) -> {
                             if (!queued && RunConditionDialog.handles(message)) {
                                 RunConditionDialog.show(this, rule, message, this::finish);

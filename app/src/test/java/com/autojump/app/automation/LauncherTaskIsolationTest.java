@@ -8,6 +8,17 @@ import static org.junit.Assert.*;
 
 /** Structural guard; actual launcher warm-start behavior still needs device acceptance. */
 public class LauncherTaskIsolationTest {
+    @Test public void ordinaryLauncherNeverRequiresDefaultInstruction() throws Exception {
+        File source = new File("src/main/java/com/autojump/app/MainActivity.java");
+        if (!source.exists()) source = new File("app/src/main/java/com/autojump/app/MainActivity.java");
+        String code = new String(java.nio.file.Files.readAllBytes(source.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8);
+        assertFalse(code.contains("defaultId()"));
+        assertTrue(code.contains("LauncherRuleSelection.select"));
+        assertTrue(code.contains("enqueueMatching(this, selection.matches"));
+        assertTrue(code.contains("intent.getStringExtra(\"rule_id\")"));
+    }
+
     @Test public void failureNeverAutomaticallyLaunchesPermissionOrManagementPage() throws Exception {
         File source = new File("src/main/java/com/autojump/app/MainActivity.java");
         if (!source.exists()) source = new File("app/src/main/java/com/autojump/app/MainActivity.java");

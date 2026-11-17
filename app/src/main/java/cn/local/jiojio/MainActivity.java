@@ -1,4 +1,4 @@
 package cn.local.jiojio;
 
-/** Launcher executes the default instruction; tools are reached through Settings. */
+/** Launcher matches conditions; named shortcuts run only their specified instruction. */
 public final class MainActivity extends com.autojump.app.MainActivity {}

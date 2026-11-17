@@ -7,7 +7,6 @@ import android.os.Looper;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import com.autojump.app.bean.Rule;
-import com.autojump.app.data.InstructionSettings;
 import com.autojump.app.data.RuleRepository;
 import com.autojump.app.automation.AccessibilityAwareRuleRunner;
 import com.autojump.app.util.ShortcutUtil;
@@ -26,13 +25,38 @@ public class MainActivity extends AppCompatActivity {
             openManagement(); finish(); return;
         }
         boolean explicit = intent != null && (ACTION_RUN.equals(intent.getAction()) || intent.hasExtra("rule_id"));
-        String id = explicit ? intent.getStringExtra("rule_id") : new InstructionSettings(this).defaultId();
+        java.util.List<Rule> rules = new RuleRepository(this).getRules();
+        if (!explicit) {
+            com.autojump.app.engine.LauncherRuleSelection.Result selection =
+                    com.autojump.app.engine.LauncherRuleSelection.select(rules,
+                            rule -> com.autojump.app.automation.QueueCoordinator.conditionFailure(this, rule));
+            for (com.autojump.app.engine.LauncherRuleSelection.Rejection rejected : selection.rejections) {
+                new com.autojump.app.automation.ExecutionLogStore(this).append(
+                        com.autojump.app.automation.ExecutionSession.fromRule(rejected.rule, System.currentTimeMillis()),
+                        "SKIPPED", rejected.reason);
+            }
+            if (selection.matches.isEmpty()) {
+                showLaunchFailure(selection.noMatchMessage(), RuleListActivity.class);
+            } else {
+                AccessibilityAwareRuleRunner.enqueueMatching(this, selection.matches, (queued, message) -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (!queued && !message.contains("已合并")) {
+                        showLaunchFailure(message, PermissionGuideActivity.class);
+                    } else {
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                        finish();
+                    }
+                });
+            }
+            return;
+        }
+        String id = intent.getStringExtra("rule_id");
         Rule selected = null;
-        for (Rule rule : new RuleRepository(this).getRules()) if (rule.getId().equals(id)) { selected = rule; break; }
+        for (Rule rule : rules) if (rule.getId().equals(id)) { selected = rule; break; }
         if (selected == null || !selected.isEnabled() || selected.getActions().isEmpty()) {
-            String message = explicit ? "指令不存在或已停用" : "未找到有效的默认指令，请从长按菜单进入自动任务管理选择。";
+            String message = "指令不存在或已停用";
             new com.autojump.app.automation.ExecutionLogStore(this).appendDiagnostic("LAUNCH_BLOCKED", message);
-            showLaunchFailure(message, explicit ? null : RuleListActivity.class);
+            showLaunchFailure(message, null);
             return;
         } else {
             runWhenAccessibilityReady(selected);

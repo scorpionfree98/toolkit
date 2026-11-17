@@ -57,7 +57,7 @@ public class RuleListActivity extends AppCompatActivity implements RuleAdapter.O
 
         btnAddRule.setOnClickListener(v -> openNewRule());
         emptyAddRule.setOnClickListener(v -> openNewRule());
-        editDefaultLink.setOnClickListener(v -> chooseDefault());
+        editDefaultLink.setOnClickListener(v -> testRun());
         findViewById(R.id.btn_tools).setOnClickListener(v -> startActivity(new Intent(this, cn.local.jiojio.ToolboxActivity.class)));
         findViewById(R.id.btn_shortcut_retry).setOnClickListener(v -> {
             com.autojump.app.util.ShortcutUtil.retry(this);
@@ -102,11 +102,7 @@ public class RuleListActivity extends AppCompatActivity implements RuleAdapter.O
         homeSummary.setTextColor(androidx.core.content.ContextCompat.getColor(this,
                 serviceEnabled ? R.color.success : R.color.warning));
         homeSummary.setOnClickListener(v -> startActivity(new Intent(this, PermissionGuideActivity.class)));
-        String defaultId = new com.autojump.app.data.InstructionSettings(this).defaultId();
-        Rule chosen = null;
-        for (Rule r : mRuleList) if (r.getId().equals(defaultId)) chosen = r;
-        defaultDeeplink.setText(chosen == null ? "尚未选择默认指令" : chosen.getName()
-                + (chosen.isEnabled() ? " · 普通点击即执行" : " · 已停用，请重新选择"));
+        defaultDeeplink.setText("桌面图标：按优先级逐条匹配条件，符合条件的任务串行执行。\n任务卡片的运行按钮：本次忽略匹配条件。");
         ((TextView)findViewById(R.id.tv_shortcut_status)).setText(com.autojump.app.util.ShortcutUtil.status(this));
         boolean empty = mRuleList.isEmpty();
         emptyState.setVisibility(empty ? View.VISIBLE : View.GONE);
@@ -139,8 +135,8 @@ public class RuleListActivity extends AppCompatActivity implements RuleAdapter.O
 
     private void testRun() {
         new MaterialAlertDialogBuilder(this)
-                .setTitle("运行默认指令")
-                .setMessage("与点击桌面图标相同：仅运行你选定的默认指令，轮到执行时检查条件。")
+                .setTitle("按条件运行任务")
+                .setMessage("与点击桌面图标相同：逐条检查已启用任务，数字大的优先。符合条件的任务加入串行队列。")
                 .setPositiveButton("执行", (d, w) -> {
                     startActivity(new Intent(this, cn.local.jiojio.MainActivity.class));
                 })
@@ -153,9 +149,9 @@ public class RuleListActivity extends AppCompatActivity implements RuleAdapter.O
         java.lang.ref.WeakReference<RuleListActivity> owner = new java.lang.ref.WeakReference<>(this);
         new MaterialAlertDialogBuilder(this)
                 .setTitle("运行「" + rule.getName() + "」")
-                .setMessage("加入串行队列，轮到执行时检查条件。目标页面可能实际提交打卡。")
+                .setMessage("本次手动运行忽略时间、Wi‑Fi 等匹配条件；仍检查执行权限并遵守系统解锁要求。目标页面可能实际提交打卡。")
                 .setPositiveButton("运行", (d, w) ->
-                        AccessibilityAwareRuleRunner.enqueue(this, rule, (queued, message) -> {
+                        AccessibilityAwareRuleRunner.enqueueManual(this, rule, (queued, message) -> {
                             RuleListActivity page = owner.get();
                             if (page == null || page.isFinishing() || page.isDestroyed()) return;
                             if (!queued) {
@@ -240,7 +236,7 @@ public class RuleListActivity extends AppCompatActivity implements RuleAdapter.O
                     .getString("previous_rules", "");
             if (backup.isEmpty()) { Toast.makeText(this, "没有导入备份", Toast.LENGTH_SHORT).show(); return true; }
             new MaterialAlertDialogBuilder(this).setTitle("恢复导入前的指令")
-                    .setMessage("将替换当前指令。恢复后不会自动执行，请重新选择默认指令。")
+                    .setMessage("将替换当前指令。恢复后不会自动执行；桌面入口会按条件匹配已启用任务。")
                     .setPositiveButton("恢复", (d,w) -> {
                         SPUtil.saveRuleList(this, new RuleRepository(this).importRules(backup));
                         new com.autojump.app.data.InstructionSettings(this).setDefaultId("");
@@ -324,7 +320,7 @@ public class RuleListActivity extends AppCompatActivity implements RuleAdapter.O
                     .append(" 个动作 / ").append(r.getConditions().size()).append(" 个条件\n");
         }
         if(rules.size()>6)text.append("…另有 ").append(rules.size()-6).append(" 条\n");
-        return text.append("\n导入不会执行或发布快捷方式，默认指令需重新选择。是否覆盖当前指令？").toString();
+        return text.append("\n导入不会执行或发布快捷方式。桌面入口将按条件匹配已启用任务。是否覆盖当前指令？").toString();
     }
 
     private static final int REQUEST_CODE_IMPORT = 1001;

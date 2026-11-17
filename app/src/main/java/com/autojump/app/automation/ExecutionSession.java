@@ -9,6 +9,9 @@ import java.util.UUID;
 public class ExecutionSession {
     public enum Status { QUEUED, PENDING, WAITING, RUNNING, COMPLETED, FAILED, CANCELLED, SKIPPED }
     private long sequence;
+    private boolean ignoreConditions;
+    public boolean isIgnoreConditions() { return ignoreConditions; }
+    public void setIgnoreConditions(boolean value) { ignoreConditions = value; }
     private boolean cancelRequested;
     public boolean isCancelRequested() { return cancelRequested; }
     public void requestCancel() { cancelRequested = true; }

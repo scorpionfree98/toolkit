@@ -27,7 +27,13 @@ public final class QueueCoordinator {
     static ExecutionSession enqueueDeferred(Context context, Rule rule) {
         return enqueue(context, rule, false);
     }
+    static ExecutionSession enqueueDeferred(Context context, Rule rule, boolean ignoreConditions) {
+        return enqueue(context, rule, false, ignoreConditions);
+    }
     private static ExecutionSession enqueue(Context context, Rule rule, boolean dispatch) {
+        return enqueue(context, rule, dispatch, false);
+    }
+    private static ExecutionSession enqueue(Context context, Rule rule, boolean dispatch, boolean ignoreConditions) {
         synchronized (LOCK) {
             PendingExecutionStore store = new PendingExecutionStore(context);
             long now = System.currentTimeMillis();
@@ -36,6 +42,11 @@ public final class QueueCoordinator {
             }
             List<ExecutionSession> queue = QueuePolicy.ordered(store.getAll());
             for (ExecutionSession old : queue) if (rule.getId().equals(old.getRuleId())) {
+                if (ignoreConditions && old.getStatus() == ExecutionSession.Status.QUEUED) {
+                    old.setIgnoreConditions(true);
+                    store.upsert(old);
+                    new ExecutionLogStore(context).append(old, "MANUAL_OVERRIDE", "本次手动运行忽略匹配条件");
+                }
                 Toast.makeText(context, "指令已在运行或排队，本次触发已合并", Toast.LENGTH_SHORT).show();
                 return old;
             }
@@ -44,11 +55,13 @@ public final class QueueCoordinator {
                 return null;
             }
             ExecutionSession session = ExecutionSession.fromRule(rule, now);
+            session.setIgnoreConditions(ignoreConditions);
             session.setSequence(store.nextSequence());
             deadline(context, session, now, QueuePolicy.QUEUE_TIMEOUT_MS);
             session.setStatus(ExecutionSession.Status.QUEUED);
             store.upsert(session);
-            new ExecutionLogStore(context).append(session, "QUEUED", "指令已排队");
+            new ExecutionLogStore(context).append(session, "QUEUED", ignoreConditions
+                    ? "手动运行已排队；本次忽略匹配条件" : "指令已排队");
             if (dispatch) pump(context);
             return session;
         }
@@ -97,7 +110,10 @@ public final class QueueCoordinator {
                 }
                 if (latest == null || !latest.isEnabled()) terminal(context, next, "SKIPPED", "指令已删除或停用");
                 else {
-                    String reason = conditionFailure(context, latest);
+                    Rule checkedRule = latest;
+                    Context checkedContext = context;
+                    String reason = ExecutionConditionPolicy.failure(next.isIgnoreConditions(),
+                            () -> conditionFailure(checkedContext, checkedRule));
                     if (reason != null) terminal(context, next, "SKIPPED", reason);
                     else {
                         next.startFrom(latest, now);
@@ -107,7 +123,8 @@ public final class QueueCoordinator {
                             next.setUnlockElapsedDeadline(android.os.SystemClock.elapsedRealtime() + QueuePolicy.UNLOCK_TIMEOUT_MS);
                         }
                         store.upsert(next);
-                        new ExecutionLogStore(context).append(next, "STARTED", "轮到执行，条件检查通过");
+                        new ExecutionLogStore(context).append(next, "STARTED", next.isIgnoreConditions()
+                                ? "轮到手动执行；本次忽略匹配条件" : "轮到执行，条件检查通过");
                         new AutomationOrchestrator(context).startSession(context, next);
                         active = store.findById(next.getId());
                     }

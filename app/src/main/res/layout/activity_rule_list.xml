@@ -22,15 +22,15 @@
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="设置目标页面，录制要点击的按钮。保存后就能一键运行。" android:textAppearance="@style/TextAppearance.AutoJump.Caption" android:layout_marginTop="8dp"/>
         <com.google.android.material.button.MaterialButton android:id="@+id/btn_empty_add_rule" style="@style/Widget.AutoJump.Button.Primary" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="创建第一条指令"/>
       </LinearLayout>
-      <com.google.android.material.button.MaterialButton android:id="@+id/btn_test_run" style="@style/Widget.AutoJump.Button.Primary" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="运行默认指令"/>
+      <com.google.android.material.button.MaterialButton android:id="@+id/btn_test_run" style="@style/Widget.AutoJump.Button.Primary" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="按条件运行任务"/>
       <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="按触发顺序排队，轮到执行时检查已配置条件。" android:textAppearance="@style/TextAppearance.AutoJump.Caption" android:layout_marginTop="8dp"/>
       <Space android:layout_width="1dp" android:layout_height="24dp"/>
       <com.google.android.material.card.MaterialCardView style="@style/Widget.AutoJump.Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="16dp">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
-          <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="默认指令" android:textAppearance="@style/TextAppearance.AutoJump.SectionTitle" android:layout_marginTop="8dp"/>
-          <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="普通点击图标或手机自动助手启动时，执行这一条指令。" android:textAppearance="@style/TextAppearance.AutoJump.Caption" android:layout_marginTop="8dp"/>
-          <TextView android:id="@+id/tv_default_deeplink" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:singleLine="true" android:ellipsize="middle" android:textAppearance="@style/TextAppearance.AutoJump.Caption"/>
-          <com.google.android.material.button.MaterialButton android:id="@+id/btn_edit_default_link" style="@style/Widget.AutoJump.Button.Outlined" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="选择默认指令"/>
+          <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="桌面启动方式" android:textAppearance="@style/TextAppearance.AutoJump.SectionTitle" android:layout_marginTop="8dp"/>
+          <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="普通点击图标或手机自动助手启动时，按条件匹配任务；无需设置默认任务。" android:textAppearance="@style/TextAppearance.AutoJump.Caption" android:layout_marginTop="8dp"/>
+          <TextView android:id="@+id/tv_default_deeplink" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:textAppearance="@style/TextAppearance.AutoJump.Caption"/>
+          <com.google.android.material.button.MaterialButton android:id="@+id/btn_edit_default_link" style="@style/Widget.AutoJump.Button.Outlined" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="按条件检查并运行"/>
         </LinearLayout>
       </com.google.android.material.card.MaterialCardView>
     <com.google.android.material.button.MaterialButton android:id="@+id/btn_tools" style="@style/Widget.AutoJump.Button.Outlined" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="地图与工具 · 高德 / 收藏 / 硬件 / 测速" />
