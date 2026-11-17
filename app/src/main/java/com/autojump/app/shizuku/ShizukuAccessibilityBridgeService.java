@@ -7,7 +7,6 @@ import cn.local.jiojio.BuildConfig;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /** Minimal Shizuku user service. It accepts only one validated accessibility component. */
@@ -26,24 +25,24 @@ public final class ShizukuAccessibilityBridgeService
             throw new RemoteException("无障碍组件格式无效");
         }
         try {
-            String before = run("settings", "get", "secure",
-                    "enabled_accessibility_services").trim();
-            Set<String> enabled = AccessibilityServiceListPolicy.parse(before);
-            boolean alreadyEnabled = enabled.contains(componentName);
-            enabled.add(componentName);
-            run("settings", "put", "secure", "enabled_accessibility_services",
-                    AccessibilityServiceListPolicy.join(enabled));
-            run("settings", "put", "secure", "accessibility_enabled", "1");
-
-            String verifiedServices = run("settings", "get", "secure",
-                    "enabled_accessibility_services").trim();
+            String result = AccessibilityReconnect.restore(new AccessibilityReconnect.Settings() {
+                @Override public String services() throws Exception {
+                    return run("settings", "get", "secure", "enabled_accessibility_services").trim();
+                }
+                @Override public void services(String value) throws Exception {
+                    run("settings", "put", "secure", "enabled_accessibility_services", value);
+                }
+                @Override public void enableFramework() throws Exception {
+                    run("settings", "put", "secure", "accessibility_enabled", "1");
+                }
+                @Override public void awaitUnbind() throws Exception { Thread.sleep(500L); }
+            }, componentName);
             String verifiedFlag = run("settings", "get", "secure",
                     "accessibility_enabled").trim();
-            if (!AccessibilityServiceListPolicy.contains(verifiedServices, componentName)
-                    || !"1".equals(verifiedFlag)) {
+            if (!"1".equals(verifiedFlag)) {
                 throw new IllegalStateException("系统设置回读未确认恢复结果");
             }
-            return alreadyEnabled ? "ALREADY_ENABLED" : "RESTORED";
+            return result;
         } catch (Exception error) {
             RemoteException remote = new RemoteException(error.getMessage() == null
                     ? "Shizuku 恢复失败" : error.getMessage());

@@ -56,6 +56,26 @@ public class ExecutionLogStore {
         }
     }
 
+    /** Local diagnostics contain state only, never rule actions, URLs or credentials. */
+    public void appendDiagnostic(String status, String message) {
+        synchronized (LOCK) {
+            try {
+                List<Entry> entries = getAll();
+                entries.add(0, new Entry(System.currentTimeMillis(), "diagnostic",
+                        "系统诊断", status, message));
+                if (entries.size() > MAX_ENTRIES) entries = new ArrayList<>(entries.subList(0, MAX_ENTRIES));
+                // Persist lifecycle evidence before HyperOS can terminate the process.
+                if (!preferences.edit().putString(KEY_LOGS, gson.toJson(entries)).commit()) {
+                    android.util.Log.w("ToolkitDiagnostics", "Diagnostic persistence failed");
+                }
+            } catch (RuntimeException error) {
+                // Diagnostics must never crash the launcher/service or overwrite unreadable logs.
+                android.util.Log.w("ToolkitDiagnostics", "Diagnostic unavailable: "
+                        + error.getClass().getSimpleName());
+            }
+        }
+    }
+
     public List<Entry> getAll() {
         synchronized (LOCK) {
             String json = preferences.getString(KEY_LOGS, "");

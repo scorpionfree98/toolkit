@@ -20,7 +20,7 @@ import rikka.shizuku.Shizuku;
 public final class ShizukuAccessibilityRecovery {
     public static final int REQUEST_PERMISSION = 4107;
     private static final long BIND_TIMEOUT_MS = 25_000L;
-    private static final int CONNECTION_CHECK_ATTEMPTS = 6;
+    private static final int CONNECTION_CHECK_ATTEMPTS = 20;
     private static final long CONNECTION_CHECK_INTERVAL_MS = 300L;
     private static final List<Callback> waitingCallbacks = new ArrayList<>();
     private static boolean recovering;
@@ -60,6 +60,8 @@ public final class ShizukuAccessibilityRecovery {
             if (recovering) return;
             recovering = true;
             recoverInternal(app, (success, message) -> {
+                new com.autojump.app.automation.ExecutionLogStore(app).appendDiagnostic(
+                        success ? "RECOVERY_CONNECTED" : "RECOVERY_FAILED", message);
                 List<Callback> batch = new ArrayList<>(waitingCallbacks);
                 waitingCallbacks.clear();
                 recovering = false;
@@ -75,13 +77,16 @@ public final class ShizukuAccessibilityRecovery {
             return;
         }
         Handler main = new Handler(Looper.getMainLooper());
+        long previousConnection = AutoJumpAccessibilityService.connectionGeneration();
+        new com.autojump.app.automation.ExecutionLogStore(app).appendDiagnostic(
+                "RECOVERY", "开始定向重连自动点击服务；不重启手机");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         RecoveryAttempt attempt = new RecoveryAttempt();
         Shizuku.UserServiceArgs args = new Shizuku.UserServiceArgs(
                 new ComponentName(app, ShizukuAccessibilityBridgeService.class))
                 .processNameSuffix("accessibility_recovery")
                 .daemon(false)
-                .version(1);
+                .version(2);
         ServiceConnection connection = new ServiceConnection() {
             @Override public void onServiceConnected(ComponentName name, IBinder binder) {
                 if (executor.isShutdown() || !attempt.claimConnection()) return;
@@ -95,10 +100,10 @@ public final class ShizukuAccessibilityRecovery {
                             String result = IShizukuAccessibilityBridge.Stub.asInterface(binder)
                                     .restoreAccessibility(component);
                             settingConfirmed = "RESTORED".equals(result)
-                                    || "ALREADY_ENABLED".equals(result);
+                                    || "RECONNECTED".equals(result);
                             message = "RESTORED".equals(result)
                                     ? "系统设置已恢复，正在确认服务状态"
-                                    : "系统设置中已启用，正在确认服务状态";
+                                    : "已请求服务重连，正在确认新连接";
                         } catch (Exception error) {
                             message = error.getMessage() == null
                                     ? "Shizuku 恢复失败" : error.getMessage();
@@ -106,7 +111,7 @@ public final class ShizukuAccessibilityRecovery {
                         boolean finalSettingConfirmed = settingConfirmed;
                         String finalMessage = message;
                         main.post(() -> finish(app, args, this, executor, attempt,
-                                finalSettingConfirmed, finalMessage, callback));
+                                finalSettingConfirmed, finalMessage, previousConnection, callback));
                     });
                 } catch (RejectedExecutionException ignored) {
                     // Shizuku can deliver a duplicate connection callback while a
@@ -116,7 +121,7 @@ public final class ShizukuAccessibilityRecovery {
 
             @Override public void onServiceDisconnected(ComponentName name) {
                 main.post(() -> finish(app, args, this, executor, attempt,
-                        false, "Shizuku 服务已断开，未确认恢复结果", callback));
+                        false, "Shizuku 服务已断开，未确认恢复结果", previousConnection, callback));
             }
         };
         main.postDelayed(() -> {
@@ -141,7 +146,7 @@ public final class ShizukuAccessibilityRecovery {
     private static void finish(Context context, Shizuku.UserServiceArgs args,
                                ServiceConnection connection, ExecutorService executor,
                                RecoveryAttempt attempt, boolean settingConfirmed, String message,
-                               Callback callback) {
+                               long previousConnection, Callback callback) {
         if (!attempt.finish()) return;
         safeUnbind(args, connection);
         executor.shutdownNow();
@@ -149,14 +154,15 @@ public final class ShizukuAccessibilityRecovery {
             callback.onResult(false, message);
             return;
         }
-        confirmServiceConnection(context, message, callback, 0);
+        confirmServiceConnection(context, message, callback, previousConnection, 0);
     }
 
     private static void confirmServiceConnection(Context context, String message,
-                                                 Callback callback, int attempt) {
+                                                 Callback callback, long previousConnection, int attempt) {
         boolean settingEnabled = AccessibilityServiceState.isEnabled(context);
         boolean serviceConnected = AutoJumpAccessibilityService.connectedContext() != null;
-        if (settingEnabled && serviceConnected) {
+        if (RecoveryConnectionPolicy.confirmed(settingEnabled, serviceConnected,
+                previousConnection, AutoJumpAccessibilityService.connectionGeneration())) {
             callback.onResult(true, "自动点击服务已恢复并确认连接 ✓");
             return;
         }
@@ -165,7 +171,7 @@ public final class ShizukuAccessibilityRecovery {
             return;
         }
         new Handler(Looper.getMainLooper()).postDelayed(
-                () -> confirmServiceConnection(context, message, callback, attempt + 1),
+                () -> confirmServiceConnection(context, message, callback, previousConnection, attempt + 1),
                 CONNECTION_CHECK_INTERVAL_MS);
     }
 

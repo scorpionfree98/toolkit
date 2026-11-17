@@ -29,6 +29,8 @@ import java.util.Map;
 /** Executes only persisted, user-authored click actions for their exact target package. */
 public class AutoJumpAccessibilityService extends AccessibilityService {
     private static AutoJumpAccessibilityService connected;
+    private static long connectionGeneration;
+    public static long connectionGeneration() { return connectionGeneration; }
     public static Context connectedContext() { return connected; }
     /** Hands a delayed recorded touch to Android before a cross-app launch can suspend us. */
     public static boolean armRecordedTouch(String sessionId, RuleAction action) {
@@ -67,6 +69,8 @@ public class AutoJumpAccessibilityService extends AccessibilityService {
         super.onServiceConnected();
         ensureStores();
         connected = this;
+        connectionGeneration++;
+        logs.appendDiagnostic("SERVICE_CONNECTED", "自动点击服务已建立连接");
         android.util.Log.i("ToolkitClickService", "connected pid=" + android.os.Process.myPid());
         QueueCoordinator.pump(this);
         updateRecordingOverlay();
@@ -106,8 +110,19 @@ public class AutoJumpAccessibilityService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
+        ensureStores();
+        logs.appendDiagnostic("SERVICE_INTERRUPTED", "系统中断自动点击反馈；不代表服务已关闭");
         hideRecordingOverlay();
         cancelAllCallbacks();
+    }
+
+    @Override public boolean onUnbind(Intent intent) {
+        if (connected == this) connected = null;
+        ensureStores();
+        logs.appendDiagnostic("SERVICE_UNBOUND", "自动点击服务已解除绑定");
+        hideRecordingOverlay();
+        cancelAllCallbacks();
+        return super.onUnbind(intent);
     }
 
     @Override

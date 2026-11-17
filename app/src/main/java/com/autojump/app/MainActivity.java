@@ -18,6 +18,9 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onCreate(Bundle state) { super.onCreate(state); handle(getIntent()); }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); handle(intent); }
     private void handle(Intent intent) {
+        new com.autojump.app.automation.ExecutionLogStore(this).appendDiagnostic(
+                "LAUNCHER", intent != null && intent.getBooleanExtra("open_settings", false)
+                        ? "收到显式管理入口请求" : "收到执行入口请求");
         ShortcutUtil.refreshDynamicShortcut(this);
         if (intent != null && intent.getBooleanExtra("open_settings", false)) {
             openManagement(); finish(); return;
@@ -27,13 +30,14 @@ public class MainActivity extends AppCompatActivity {
         Rule selected = null;
         for (Rule rule : new RuleRepository(this).getRules()) if (rule.getId().equals(id)) { selected = rule; break; }
         if (selected == null || !selected.isEnabled() || selected.getActions().isEmpty()) {
-            Toast.makeText(this, explicit ? "指令不存在或已停用" : "请先选择有效的默认指令", Toast.LENGTH_LONG).show();
-            if (!explicit) openManagement();
+            String message = explicit ? "指令不存在或已停用" : "未找到有效的默认指令，请从长按菜单进入自动任务管理选择。";
+            new com.autojump.app.automation.ExecutionLogStore(this).appendDiagnostic("LAUNCH_BLOCKED", message);
+            showLaunchFailure(message, explicit ? null : RuleListActivity.class);
+            return;
         } else {
             runWhenAccessibilityReady(selected);
             return;
         }
-        finish();
     }
 
     private void runWhenAccessibilityReady(Rule rule) {
@@ -52,14 +56,30 @@ public class MainActivity extends AppCompatActivity {
                             RunConditionDialog.show(page, rule, message, page::finish);
                             return;
                         }
-                        Toast.makeText(app, message, Toast.LENGTH_LONG).show();
                         // A merged trigger is already handled by the original request.
-                        if (!message.contains("已合并")) app.startActivity(
-                                new Intent(app, PermissionGuideActivity.class)
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                        if (page != null && !page.isFinishing() && !page.isDestroyed()
+                                && !message.contains("已合并")) {
+                            page.showLaunchFailure(message, PermissionGuideActivity.class);
+                            return;
+                        }
+                        Toast.makeText(app, message, Toast.LENGTH_LONG).show();
                     }
                     if (page != null && !page.isDestroyed()) page.finish();
                 }));
+    }
+    private void showLaunchFailure(String message, Class<?> helpPage) {
+        if (isFinishing() || isDestroyed()) return;
+        com.google.android.material.dialog.MaterialAlertDialogBuilder dialog =
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                        .setTitle("任务未执行")
+                        .setMessage(message + "\n\n本次未开始跳转或点击，不会自动打开设置页。")
+                        .setNegativeButton("关闭", null)
+                        .setOnDismissListener(ignored -> finish());
+        if (helpPage != null) dialog.setPositiveButton(
+                helpPage == RuleListActivity.class ? "自动任务管理" : "查看权限与诊断",
+                (ignored, which) -> startActivity(new Intent(this, helpPage)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
+        dialog.show();
     }
     private void openManagement() {
         // Keep management outside the transient launcher task. Otherwise Android may

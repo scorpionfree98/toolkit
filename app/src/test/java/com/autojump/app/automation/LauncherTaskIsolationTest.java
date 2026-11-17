@@ -8,6 +8,18 @@ import static org.junit.Assert.*;
 
 /** Structural guard; actual launcher warm-start behavior still needs device acceptance. */
 public class LauncherTaskIsolationTest {
+    @Test public void failureNeverAutomaticallyLaunchesPermissionOrManagementPage() throws Exception {
+        File source = new File("src/main/java/com/autojump/app/MainActivity.java");
+        if (!source.exists()) source = new File("app/src/main/java/com/autojump/app/MainActivity.java");
+        String code = new String(java.nio.file.Files.readAllBytes(source.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8);
+        // Structural regression guard; the dialog itself still needs Android acceptance.
+        assertFalse(code.contains("if (!explicit) openManagement()"));
+        assertFalse(code.contains("new Intent(app, PermissionGuideActivity.class)"));
+        assertTrue(code.contains("page.showLaunchFailure(message, PermissionGuideActivity.class)"));
+        assertTrue(code.contains("setNegativeButton(\"关闭\""));
+    }
+
     @Test public void launcherCannotResumeManagementTask() throws Exception {
         File manifest = new File("src/main/AndroidManifest.xml");
         if (!manifest.exists()) manifest = new File("app/src/main/AndroidManifest.xml");

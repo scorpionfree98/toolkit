@@ -82,7 +82,12 @@ public final class AccessibilityAwareRuleRunner {
                                     () -> QueueCoordinator.pump(launchContext));
                         }
                     });
-            gate.run(snapshot, requiresAccessibility(snapshot), callback::onResult);
+            gate.run(snapshot, requiresAccessibility(snapshot), (queued, message) -> {
+                if (!queued) new ExecutionLogStore(app).append(
+                        ExecutionSession.fromRule(snapshot, System.currentTimeMillis()),
+                        "BLOCKED", message);
+                callback.onResult(queued, message);
+            });
         });
     }
 
