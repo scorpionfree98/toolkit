@@ -39,6 +39,7 @@ public class ExecutionLogStore {
     private static final String KEY_LOGS = "execution_logs";
     private final SharedPreferences preferences;
     private final Gson gson = new Gson();
+    private boolean readable = true;
 
     public ExecutionLogStore(Context context) {
         preferences = context.getApplicationContext().getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
@@ -47,6 +48,7 @@ public class ExecutionLogStore {
     public void append(ExecutionSession session, String status, String message) {
         synchronized (LOCK) {
             List<Entry> entries = getAll();
+            if (!readable) return;
             Entry entry = new Entry(System.currentTimeMillis(), session.getId(),
                     session.getRuleName(), status, message);
             entry.ruleId = session.getRuleId();
@@ -61,6 +63,7 @@ public class ExecutionLogStore {
         synchronized (LOCK) {
             try {
                 List<Entry> entries = getAll();
+                if (!readable) return;
                 entries.add(0, new Entry(System.currentTimeMillis(), "diagnostic",
                         "系统诊断", status, message));
                 if (entries.size() > MAX_ENTRIES) entries = new ArrayList<>(entries.subList(0, MAX_ENTRIES));
@@ -78,11 +81,18 @@ public class ExecutionLogStore {
 
     public List<Entry> getAll() {
         synchronized (LOCK) {
+            readable = true;
             String json = preferences.getString(KEY_LOGS, "");
             if (json == null || json.isEmpty()) return new ArrayList<>();
             Type type = new TypeToken<List<Entry>>() {}.getType();
-            List<Entry> entries = gson.fromJson(json, type);
-            return entries == null ? new ArrayList<>() : entries;
+            try {
+                List<Entry> entries = gson.fromJson(json, type);
+                if (entries == null || entries.contains(null)) throw new IllegalArgumentException("INVALID_LOG");
+                return entries;
+            } catch (RuntimeException error) {
+                readable = com.autojump.app.data.CorruptDataArchive.quarantine(preferences, KEY_LOGS, json);
+                return new ArrayList<>();
+            }
         }
     }
 

@@ -1,0 +1,18 @@
+<resources>
+    <style name="CaptureThemeBase" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">#00695C</item>
+        <item name="android:colorControlActivated">#00695C</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:statusBarColor">#F2F5F3</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:windowBackground">#F2F5F3</item>
+        <item name="android:alertDialogTheme">@style/CaptureDialogTheme</item>
+    </style>
+    <style name="CaptureTheme" parent="CaptureThemeBase" />
+    <style name="CaptureDialogTheme" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorAccent">#00695C</item>
+        <item name="android:windowMinWidthMajor">90%</item>
+        <item name="android:windowMinWidthMinor">90%</item>
+    </style>
+</resources>

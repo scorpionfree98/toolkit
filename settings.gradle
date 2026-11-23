@@ -14,3 +14,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = 'Toolkit'
 include ':app'
+
+include ':capture', ':capture-core'

@@ -1,0 +1,4 @@
+<resources>
+    <item name="capture_expected_before" type="id" />
+    <item name="capture_desired_after" type="id" />
+</resources>

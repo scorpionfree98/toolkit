@@ -23,10 +23,32 @@ public class PendingExecutionStore {
         synchronized (LOCK) {
             String json = preferences.getString(KEY_SESSIONS, "");
             if (json == null || json.isEmpty()) return new ArrayList<>();
-            Type type = new TypeToken<List<ExecutionSession>>() {}.getType();
-            List<ExecutionSession> result = gson.fromJson(json, type);
-            return result == null ? new ArrayList<>() : result;
+            try { return decode(json); }
+            catch (RuntimeException error) {
+                com.autojump.app.data.CorruptDataArchive.quarantine(preferences, KEY_SESSIONS, json);
+                android.util.Log.w("ToolkitQueue", "Unreadable queue isolated; no actions replayed");
+                return new ArrayList<>();
+            }
         }
+    }
+
+    static List<ExecutionSession> decode(String json) {
+        if (json == null || json.trim().isEmpty()) return new ArrayList<>();
+        if (!json.trim().startsWith("[")) throw new IllegalArgumentException("INVALID_QUEUE");
+        Type type = new TypeToken<List<ExecutionSession>>() {}.getType();
+        List<ExecutionSession> result = new Gson().fromJson(json, type);
+        if (result == null || result.size() > QueuePolicy.CAPACITY) throw new IllegalArgumentException("INVALID_QUEUE");
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (ExecutionSession s : result) {
+            if (s == null || s.getId() == null || s.getRuleId() == null || s.getStatus() == null
+                    || s.getActions() == null || s.getActions().contains(null) || !ids.add(s.getId()))
+                throw new IllegalArgumentException("INVALID_QUEUE_ENTRY");
+        }
+        return result;
+    }
+
+    private void requireReadable() {
+        decode(preferences.getString(KEY_SESSIONS, ""));
     }
 
     public void upsert(ExecutionSession session) {
@@ -63,16 +85,20 @@ public class PendingExecutionStore {
     }
 
     public void clear() {
-        synchronized (LOCK) { preferences.edit().remove(KEY_SESSIONS).apply(); }
+        synchronized (LOCK) { requireReadable(); preferences.edit().remove(KEY_SESSIONS).apply(); }
     }
 
     private void save(List<ExecutionSession> sessions) {
-        preferences.edit().putString(KEY_SESSIONS, gson.toJson(sessions)).commit();
+        requireReadable();
+        if (!preferences.edit().putString(KEY_SESSIONS, gson.toJson(sessions)).commit())
+            throw new IllegalStateException("任务队列保存失败，本次不执行");
     }
     public long nextSequence() {
         synchronized (LOCK) {
             long next = preferences.getLong("queue_sequence", 0L) + 1;
-            preferences.edit().putLong("queue_sequence", next).commit();
+            requireReadable();
+            if (!preferences.edit().putLong("queue_sequence", next).commit())
+                throw new IllegalStateException("任务序号保存失败，本次不执行");
             return next;
         }
     }

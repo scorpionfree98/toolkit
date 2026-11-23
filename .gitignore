@@ -28,6 +28,8 @@ build-checks/
 
 # Log
 *.log
+__pycache__/
+*.py[cod]
 
 # 本地验收产物
 artifacts/
@@ -41,3 +43,18 @@ artifacts/
 *.env.*
 *backup*
 *备份*
+
+# Verified embedded runtime, required for offline capture builds (contains no device CA).
+!capture/src/main/assets/embedded/runtime.bin
+
+# Local investigations and device evidence; not public release documentation.
+docs/longhu/
+scripts/longhu_checkin_probe.py
+docs/architecture-review-20261123.md
+docs/optimization-20261123.md
+docs/remaining-work-20261123.md
+docs/stability-completion-20261123.md
+docs/device-acceptance-20261123.md
+docs/mock-location-regression.md
+docs/capture/VERIFICATION.md
+docs/capture/upstream-*.md

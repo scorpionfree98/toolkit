@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <!-- Capture is reachable only through the Android 10+/ARM64 entry gate. Other tools retain API 26 support. -->
+    <uses-sdk tools:overrideLibrary="local.jdcapture" />
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
@@ -23,7 +25,7 @@
         <intent><action android:name="android.intent.action.VIEW"/></intent>
         <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>
     </queries>
-    <application android:name=".ToolkitApplication" android:label="工具合集" android:theme="@style/AppTheme" android:icon="@drawable/ic_app" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
+    <application android:extractNativeLibs="true" android:name=".ToolkitApplication" android:label="工具合集" android:theme="@style/AppTheme" android:icon="@drawable/ic_app" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
         <meta-data android:name="com.amap.api.v2.apikey" android:value="${AMAP_API_KEY}"/>
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
@@ -51,6 +53,7 @@
         <activity android:name="com.autojump.app.ui.ClickActionEditActivity" android:exported="false" android:theme="@style/Theme.AutoJump" />
         <activity android:name="com.autojump.app.PermissionGuideActivity" android:exported="false" android:theme="@style/Theme.AutoJump" />
         <activity android:name="com.autojump.app.SettingsActivity" android:exported="false" android:theme="@style/Theme.AutoJump" />
+        <activity android:name="com.autojump.app.DataRecoveryActivity" android:exported="false" android:theme="@style/Theme.AutoJump" />
         <activity android:name="com.autojump.app.UnlockGateActivity" android:exported="false" android:excludeFromRecents="true" android:launchMode="singleTop" android:showWhenLocked="true" android:turnScreenOn="true" android:theme="@style/Theme.AutoJumpTransparent" />
         <service android:name="com.autojump.app.automation.AutoJumpAccessibilityService" android:exported="true" android:label="@string/accessibility_service_label" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>

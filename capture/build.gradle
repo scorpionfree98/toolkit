@@ -1,0 +1,27 @@
+plugins { id 'com.android.library' }
+android {
+    namespace 'local.jdcapture'
+    compileSdk 35
+    defaultConfig { minSdk 29 }
+    buildFeatures { aidl true; buildConfig true }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
+    }
+    lint { abortOnError true }
+}
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    implementation project(':capture-core')
+    implementation 'com.wireguard.android:tunnel:1.0.20260102'
+    implementation 'dev.rikka.shizuku:api:13.1.5'
+    implementation 'dev.rikka.shizuku:provider:13.1.5'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+}
+tasks.register('prepareEmbeddedRuntime', Exec) {
+    workingDir projectDir
+    commandLine 'python3', 'scripts/prepare-runtime.py'
+}
+tasks.named('preBuild').configure { dependsOn 'prepareEmbeddedRuntime' }

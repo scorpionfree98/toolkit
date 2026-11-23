@@ -1,0 +1,18 @@
+VPN integration dependencies
+
+WireGuard Android Tunnel Library 1.0.20260102
+Copyright 2017-2025 WireGuard LLC. Apache-2.0.
+https://git.zx2c4.com/wireguard-android/
+
+Native wireguard-go backend: MIT; Go runtime: BSD-3-Clause.
+https://git.zx2c4.com/wireguard-go/
+https://go.dev/
+The shipped arm64-v8a libwg-go.so comes unchanged from the publisher's AAR.
+
+AndroidX Collection 1.5.0, AndroidX Annotation 1.9.1: Apache-2.0, Android Open Source Project.
+https://android.googlesource.com/platform/frameworks/support/
+Kotlin stdlib 1.9.24: Apache-2.0, JetBrains s.r.o. and Kotlin contributors.
+https://github.com/JetBrains/kotlin/
+
+The separate test client uses wireguard-go and gVisor. It is not included in this APK.
+All VPN test keys and fixtures are generated per test and are not shipped.

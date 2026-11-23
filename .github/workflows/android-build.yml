@@ -52,9 +52,12 @@ jobs:
       - name: Install Android SDK 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
+      - name: Verify pinned capture runtime and packaging policy
+        run: python3 -m unittest discover -s capture/scripts -p 'test_*.py'
+
       - name: Test and build pull request
         if: github.event_name == 'pull_request'
-        run: ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleDebug :app:assembleRelease --no-daemon
+        run: ./gradlew :capture-core:test :capture:testDebugUnitTest :app:testDebugUnitTest :capture:lintRelease :app:lintRelease :app:assembleDebug :app:assembleRelease --no-daemon
 
       - name: Test and build trusted revision
         if: github.event_name != 'pull_request'
@@ -65,7 +68,10 @@ jobs:
             echo "Configure the AMAP_API_KEY repository secret before building a distributable APK." >&2
             exit 1
           fi
-          ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleDebug :app:assembleRelease "-PAMAP_API_KEY=$AMAP_API_KEY" --no-daemon
+          ./gradlew :capture-core:test :capture:testDebugUnitTest :app:testDebugUnitTest :capture:lintRelease :app:lintRelease :app:assembleDebug :app:assembleRelease "-PAMAP_API_KEY=$AMAP_API_KEY" --no-daemon
+
+      - name: Verify embedded capture assets in compiled APKs
+        run: python3 capture/scripts/verify-apk.py
 
       - name: Verify AMap key in compiled APKs
         if: github.event_name != 'pull_request'

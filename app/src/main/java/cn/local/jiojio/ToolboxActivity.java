@@ -61,6 +61,13 @@ public final class ToolboxActivity extends Activity {
         mapButton.setOnClickListener(v->{Intent pick=new Intent(this,MapPickerActivity.class);pick.putExtra("lat",latitude.getText().toString());pick.putExtra("lon",longitude.getText().toString());startActivityForResult(pick,20);});
         favoriteAction=buttonView("收藏当前选点",MINT,GREEN);location.addView(favoriteAction,margin(matchWrap(),0,dp(8),0,0));favoriteAction.setOnClickListener(v->guard(this::saveFavorite));
         startAction=buttonView("启动模拟定位",GREEN,WHITE);location.addView(startAction,margin(matchWrap(),0,dp(10),0,0));startAction.setOnClickListener(v->guard(()->startMock()));
+        TextView diagnosis=buttonView("检查定位状态",MINT,GREEN);location.addView(diagnosis,margin(matchWrap(),0,dp(8),0,0));
+        diagnosis.setOnClickListener(v->guard(()->{
+            if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},31);return;
+            }
+            new AlertDialog.Builder(this).setTitle("定位诊断（只读）").setMessage(LocationDiagnostics.read(this)).setPositiveButton("关闭",null).show();
+        }));
         stopAction=buttonView("停止并清理",WHITE,GREEN);stopAction.setBackground(roundStroke(WHITE,13,LINE));applyRipple(stopAction);LinearLayout.LayoutParams stopParams=margin(matchWrap(),0,dp(8),0,0);location.addView(stopAction,stopParams);stopAction.setVisibility(View.GONE);stopAction.setOnClickListener(v->startService(new Intent(this,MockLocationService.class).setAction("stop")));
         TextWatcher coordinateWatcher=new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){locationName.setText("");syncLocationActions();}public void afterTextChanged(Editable e){}};latitude.addTextChangedListener(coordinateWatcher);longitude.addTextChangedListener(coordinateWatcher);
 
@@ -73,6 +80,11 @@ public final class ToolboxActivity extends Activity {
         LinearLayout hardware=actionTile("⌁","硬件检测","传感器、相机等",true);LinearLayout.LayoutParams hwp=new LinearLayout.LayoutParams(0,dp(106),1);hwp.leftMargin=dp(10);toolRow.addView(hardware,hwp);hardware.setOnClickListener(v->startActivity(new Intent(this,HardwareActivity.class)));
 
         LinearLayout plates=actionTile("▤","全屏车牌","历史切换 · 置顶 · 本机保存",true);plates.setId(R.id.tool_plate_entry);page.addView(plates,margin(matchWrap(),0,dp(10),0,0));plates.setOnClickListener(v->startActivity(new Intent(this,cn.local.jiojio.plate.PlateManagerActivity.class)));
+
+        LinearLayout capture=actionTile("⇄","网络抓包","HTTP / VPN · 响应修改 · 日志导出",true);
+        capture.setId(R.id.tool_capture_entry);
+        page.addView(capture,margin(matchWrap(),0,dp(10),0,0));
+        capture.setOnClickListener(v->openCapture());
 
         sectionTitle(page,"网络测速","短样本 HTTPS 链路测试",dp(23),10);
         LinearLayout speed=column();speed.setPadding(dp(16),dp(14),dp(16),dp(14));speed.setBackground(round(WHITE,20));page.addView(speed,matchWrap());
@@ -101,7 +113,16 @@ public final class ToolboxActivity extends Activity {
     private void runNetwork(){if(probe!=null)return;NetworkProbe current=new NetworkProbe();probe=current;speedAction.setText("停止测速");speedAction.setEnabled(true);network.setText("准备中…");worker.execute(()->{try{NetworkProbe.Result r=current.run("https://speed.cloudflare.com/__down?bytes=8388608","https://speed.cloudflare.com/__up",(phase,n)->runOnUiThread(()->network.setText(phase+" · "+n/1024+" KB")));runOnUiThread(()->network.setText(String.format(Locale.US,"↓ %.2f  ↑ %.2f Mbps",r.downloadMbps,r.uploadMbps)));}catch(Exception e){runOnUiThread(()->network.setText(current.isCancelled()?"已停止":"测试失败"));}finally{runOnUiThread(()->{if(probe==current)probe=null;speedAction.setText("开始测速");speedAction.setEnabled(true);});}});}
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){super.onActivityResult(requestCode,resultCode,data);if(requestCode==20&&resultCode==RESULT_OK&&data!=null){latitude.setText(data.getStringExtra("lat"));longitude.setText(data.getStringExtra("lon"));String pickedName=data.getStringExtra("name");locationName.setText(pickedName==null?"":pickedName);if(pickedName!=null&&!pickedName.isEmpty())name.setText(pickedName);syncLocationActions();}}
     private void refreshStatus(){if(status!=null){boolean authorized=MockLocationService.authorized(this);status.setText(MockLocationService.status(this)+"\n模拟位置授权　"+(authorized?"已设置":"待设置"));syncLocationActions();}}
-    private void syncLocationActions(){if(startAction==null||latitude==null||longitude==null)return;boolean hasPoint=false;try{Position.parse(name.getText().toString(),latitude.getText().toString(),longitude.getText().toString());hasPoint=true;}catch(RuntimeException ignored){}String current=MockLocationService.status(this);boolean active=MockLocationService.running||current.startsWith("正在定位");boolean needsCleanup=active||current.contains("已中断");startAction.setText(active?"更新模拟位置":"启动模拟定位");startAction.setEnabled(hasPoint);startAction.setAlpha(hasPoint?1f:0.45f);favoriteAction.setEnabled(hasPoint);favoriteAction.setAlpha(hasPoint?1f:0.45f);stopAction.setVisibility(needsCleanup?View.VISIBLE:View.GONE);}
+    private void syncLocationActions(){if(startAction==null||latitude==null||longitude==null)return;boolean hasPoint=false;try{Position.parse(name.getText().toString(),latitude.getText().toString(),longitude.getText().toString());hasPoint=true;}catch(RuntimeException ignored){}String current=MockLocationService.status(this);boolean active=MockLocationService.running||current.startsWith("正在定位");boolean needsCleanup=active||current.contains("中断")||current.contains("清理未完成");startAction.setText(active?"更新模拟位置":"启动模拟定位");startAction.setEnabled(hasPoint);startAction.setAlpha(hasPoint?1f:0.45f);favoriteAction.setEnabled(hasPoint);favoriteAction.setAlpha(hasPoint?1f:0.45f);stopAction.setVisibility(needsCleanup?View.VISIBLE:View.GONE);}
+    private void openCapture(){
+        if(!CaptureAvailability.supported(Build.VERSION.SDK_INT,Build.SUPPORTED_ABIS)){
+            new AlertDialog.Builder(this).setTitle("当前设备不支持抓包内核")
+                .setMessage("网络抓包需要 Android 10 或更新系统，以及 ARM64 设备。其他工具可以继续使用。")
+                .setPositiveButton("知道了",null).show();return;
+        }
+        startActivity(new Intent(this,local.jdcapture.MainActivity.class));
+    }
+
     private void showSaved(String kind){List<Position> entries=store.list(kind);String[] items=new String[entries.size()];for(int i=0;i<entries.size();i++){Position p=entries.get(i);items[i]=p.name+"\n地点："+(p.locationName.isEmpty()?"未填写":p.locationName)+"\n"+p.coordinates()+"   ·   "+android.text.format.DateFormat.format("MM-dd HH:mm",p.timestamp);}new AlertDialog.Builder(this).setTitle(entries.isEmpty()?"还没有保存的位置":kind.equals("favorites")?"位置收藏":"最近使用").setItems(items,(d,index)->{Position p=entries.get(index);new AlertDialog.Builder(this).setTitle(p.name).setItems(new String[]{"填入定位表单","删除这条记录"},(dd,which)->{if(which==0){name.setText(p.name);latitude.setText(Double.toString(p.latitude));longitude.setText(Double.toString(p.longitude));locationName.setText(p.locationName);}else store.remove(kind,p.key());}).show();}).setNegativeButton("关闭",null).setNeutralButton("清空",(d,w)->new AlertDialog.Builder(this).setMessage("清空整个列表？").setPositiveButton("清空",(dd,ww)->store.clear(kind)).setNegativeButton("取消",null).show()).show();}
     private void guard(Runnable action){try{action.run();}catch(Exception e){new AlertDialog.Builder(this).setTitle("无法执行").setMessage(e.getMessage()).setPositiveButton("知道了",null).show();}}
 
