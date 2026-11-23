@@ -51,15 +51,24 @@ class AsyncEngineTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_concurrency_is_bounded(self):
         lock = threading.Lock()
+        entered, release = threading.Event(), threading.Event()
         active = peak = 0
         def slow(path, data):
             nonlocal active, peak
-            with lock: active += 1; peak = max(peak, active)
-            time.sleep(.03)
+            with lock:
+                active += 1; peak = max(peak, active)
+                if active == 2: entered.set()
+            release.wait(10)
             with lock: active -= 1
             return {}
         ns = hooks(slow)
-        results=await asyncio.gather(*(ns['bridge_async']('/event', {}) for _ in range(8)),return_exceptions=True)
+        tasks=[asyncio.create_task(ns['bridge_async']('/event', {})) for _ in range(8)]
+        try:
+            self.assertTrue(await asyncio.wait_for(asyncio.to_thread(entered.wait,5),6), 'Both admitted workers must enter')
+            self.assertEqual(2,peak)
+        finally:
+            release.set()
+            results=await asyncio.gather(*tasks,return_exceptions=True)
         self.assertEqual(2, peak)
         self.assertEqual(6,sum(isinstance(result,RuntimeError) for result in results))
 
