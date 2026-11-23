@@ -13,6 +13,18 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ProxyTest {
+    @Test public void closingIdleListenerWaitsForPortRelease() throws Exception {
+        CertificateAuthority ca=new CertificateAuthority(Files.createTempDirectory("proxy-close").toFile());
+        for(int i=0;i<30;i++) {
+            ProxyEngine proxy=new ProxyEngine(ca,new ProxyEngine.Listener(){
+                public void event(String type,String host,String detail){}
+                public byte[] response(ProxyEngine.Exchange e){return e.responseBody;}
+                public void finalCaptured(ProxyEngine.Exchange e){}
+            });
+            proxy.start(0);int port=proxy.port();proxy.close();
+            assertThrows(IOException.class,()->{try(Socket ignored=new Socket("127.0.0.1",port)) {}});
+        }
+    }
     private InputStream bytes(String s) { return new ByteArrayInputStream(s.getBytes(StandardCharsets.US_ASCII)); }
     @Test public void framingRejectsAmbiguityAndTruncation() throws Exception {
         HttpWire.Head ambiguous = HttpWire.head(bytes("POST / HTTP/1.1\r\nContent-Length: 1\r\nTransfer-Encoding: chunked\r\n\r\n"));

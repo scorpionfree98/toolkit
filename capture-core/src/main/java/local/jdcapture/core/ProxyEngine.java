@@ -33,6 +33,7 @@ public final class ProxyEngine implements AutoCloseable {
     private volatile long generation;
     private volatile boolean running;
     private ServerSocket server;
+    private Future<?> acceptTask;
     public ProxyEngine(CertificateAuthority authority, Listener listener) { this.authority = authority; this.listener = listener; }
     public synchronized void scope(Scope value) {
         if (scope == value) return;
@@ -46,7 +47,7 @@ public final class ProxyEngine implements AutoCloseable {
         if (running) return;
         server = new ServerSocket(); server.setReuseAddress(true);
         server.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), port)); running = true;
-        workers.execute(() -> {
+        acceptTask = workers.submit(() -> {
             while (running) {
                 try {
                     Socket socket = server.accept();
@@ -166,7 +167,18 @@ public final class ProxyEngine implements AutoCloseable {
     @Override public synchronized void close() {
         running = false; generation++;
         try { if (server != null) server.close(); } catch (IOException ignored) {}
-        for (Socket socket : sockets) try { socket.close(); } catch (IOException ignored) {}
-        workers.shutdownNow();
+        try {
+            // On Linux a blocked accept may retain the native listening descriptor
+            // briefly after ServerSocket.close(). Join the accept loop before
+            // reporting closure or taking the final client-socket snapshot.
+            if (acceptTask != null) acceptTask.get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); throw new IllegalStateException("LISTENER_STOP_INTERRUPTED",e);
+        } catch (ExecutionException | TimeoutException e) {
+            throw new IllegalStateException("LISTENER_STOP_FAILED",e);
+        } finally {
+            for (Socket socket : sockets) try { socket.close(); } catch (IOException ignored) {}
+            workers.shutdownNow();
+        }
     }
 }
