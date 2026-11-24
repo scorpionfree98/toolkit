@@ -86,6 +86,10 @@ public final class ToolboxActivity extends Activity {
         page.addView(capture,margin(matchWrap(),0,dp(10),0,0));
         capture.setOnClickListener(v->openCapture());
 
+        LinearLayout updates=actionTile("↓","应用更新","检查 GitHub 最新正式版",true);
+        page.addView(updates,margin(matchWrap(),0,dp(10),0,0));
+        updates.setOnClickListener(v->startActivity(new Intent(this,com.autojump.app.update.UpdateActivity.class)));
+
         sectionTitle(page,"网络测速","短样本 HTTPS 链路测试",dp(23),10);
         LinearLayout speed=column();speed.setPadding(dp(16),dp(14),dp(16),dp(14));speed.setBackground(round(WHITE,20));page.addView(speed,matchWrap());
         LinearLayout speedHead=row();speedHead.setGravity(Gravity.CENTER_VERTICAL);speed.addView(speedHead,matchWrap());

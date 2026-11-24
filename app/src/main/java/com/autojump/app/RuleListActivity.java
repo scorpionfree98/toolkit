@@ -209,11 +209,13 @@ public class RuleListActivity extends AppCompatActivity implements RuleAdapter.O
         menu.add(0, 5, 0, "固定指令到桌面");
         menu.add(0, 6, 0, "恢复导入前的指令");
         menu.add(0, 7, 0, "数据诊断与恢复");
+        menu.add(0, 8, 0, "检查更新");
         return super.onCreateOptionsMenu(menu);
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == 8) { startActivity(new Intent(this, com.autojump.app.update.UpdateActivity.class)); return true; }
         if (item.getItemId() == 7) { startActivity(new Intent(this, DataRecoveryActivity.class)); return true; }
         if (item.getItemId() == 1) {
             startActivity(new Intent(this, PermissionGuideActivity.class));

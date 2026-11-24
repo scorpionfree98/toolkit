@@ -2,6 +2,7 @@
     <!-- Capture is reachable only through the Android 10+/ARM64 entry gate. Other tools retain API 26 support. -->
     <uses-sdk tools:overrideLibrary="local.jdcapture" />
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_MOCK_LOCATION" tools:ignore="MockLocation,ProtectedPermissions"/>
@@ -26,6 +27,10 @@
         <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>
     </queries>
     <application android:extractNativeLibs="true" android:name=".ToolkitApplication" android:label="工具合集" android:theme="@style/AppTheme" android:icon="@drawable/ic_app" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
+        <activity android:name="com.autojump.app.update.UpdateActivity" android:exported="false" android:configChanges="orientation|screenSize" />
+        <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.updates" android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />
+        </provider>
         <meta-data android:name="com.amap.api.v2.apikey" android:value="${AMAP_API_KEY}"/>
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
