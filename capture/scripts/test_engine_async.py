@@ -1,5 +1,7 @@
 """Execute real hook code with a synthetic bridge. No device or business requests."""
 import ast
+import base64
+import zlib
 import asyncio
 import json
 from pathlib import Path
@@ -14,6 +16,7 @@ def hooks(bridge):
     cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'Capture')
     names = {'response', 'request'}
     nodes = [n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'bridge_async']
+    nodes += [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'bridge_error_detail']
     nodes += [n for n in cls.body if isinstance(n, ast.AsyncFunctionDef) and n.name in names]
     ns = dict(asyncio=asyncio, bridge=bridge, BRIDGE_SLOTS=None, record=lambda flow: {}, encode=lambda _: '',
               flow_record=lambda flow,decode=False: {}, report_drop=lambda error:None, CONFIG={'isolated': False}, final_request=lambda _: True, json=json,
@@ -23,6 +26,34 @@ def hooks(bridge):
 
 
 class AsyncEngineTest(unittest.IsolatedAsyncioTestCase):
+    async def test_brotli_response_reaches_bridge_without_python_decode(self):
+        received = []
+        def save(path, data):
+            received.append((path, data)); return {'changed': False}
+        ns = hooks(save)
+        tree = ast.parse((Path(__file__).resolve().parents[1] / 'src/main/assets/embedded/engine.py').read_text())
+        nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in
+                 {'flow_record', 'record', 'encode', 'bounded_content'}]
+        ns.update(base64=base64, zlib=zlib, MAX_BODY=2*1024*1024)
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), 'real-flow', 'exec'), ns)
+        class Headers(dict):
+            def items(self, multi=False): return super().items()
+        response = types.SimpleNamespace(raw_content=b'compressed-placeholder',
+            headers=Headers({'content-encoding':'br'}), status_code=200, http_version='HTTP/2')
+        flow = types.SimpleNamespace(metadata={}, response=response,
+            request=types.SimpleNamespace(pretty_url='https://capture-test.invalid/', method='GET',
+                http_version='HTTP/2', headers=Headers(), raw_content=b''),
+            client_conn=types.SimpleNamespace(transport_protocol='tcp'))
+        await ns['response'](None, flow)
+        self.assertEqual(['/response'], [path for path, _ in received])
+        self.assertNotIn('decodedBodyBase64', received[0][1])
+        self.assertEqual(response.raw_content, base64.b64decode(received[0][1]['responseBodyBase64']))
+
+    async def test_error_detail_does_not_leak_arbitrary_exception_text(self):
+        ns = hooks(lambda path, data: {})
+        self.assertEqual('BODY_TOO_LARGE', ns['bridge_error_detail'](ValueError('BODY_TOO_LARGE')))
+        self.assertEqual('ValueError', ns['bridge_error_detail'](ValueError('secret-url-token')))
+
     async def test_slow_bridge_does_not_block_event_loop(self):
         entered, release = threading.Event(), threading.Event()
         def slow(path, data):

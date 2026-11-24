@@ -31,12 +31,22 @@ MAX_BODY = 2 * 1024 * 1024
 LAST_DROP_REPORT = 0.0
 
 
+def bridge_error_detail(error):
+    # Only emit fixed internal codes, never exception text containing URLs/tokens.
+    code = str(error)
+    allowed = {"BODY_TOO_LARGE", "URL_TOO_LARGE", "HEADERS_TOO_LARGE",
+               "BRIDGE_REPLY_TOO_LARGE", "BRIDGE_REJECTED", "BRIDGE_BUSY",
+               "REPLACEMENT_TOO_LARGE", "UNSUPPORTED_BOUNDED_ENCODING",
+               "DECODE_LIMIT_OR_INVALID_STREAM"}
+    return code if code in allowed else type(error).__name__
+
+
 def report_drop(error):
     global LAST_DROP_REPORT
     now = time.monotonic()
     if now-LAST_DROP_REPORT >= 5:
         LAST_DROP_REPORT=now
-        print("CAPTURE_NOT_SAVED_OR_MODIFIED", type(error).__name__, flush=True)
+        print("CAPTURE_NOT_SAVED_OR_MODIFIED", bridge_error_detail(error), flush=True)
 
 
 def bounded_content(response):
@@ -183,7 +193,9 @@ class Capture:
         if flow.metadata.get("final_blocked"):
             return
         try:
-            result = await bridge_async("/response", lambda: flow_record(flow, decode=True))
+            # Production passes original compressed bytes to Java's bounded decoder.
+            # Decoding every response here rejected br before it could be saved.
+            result = await bridge_async("/response", lambda: flow_record(flow, decode=CONFIG["isolated"]))
             if result.get("changed"):
                 replacement = base64.b64decode(result["bodyBase64"], validate=True)
                 if len(replacement) > MAX_BODY:
@@ -195,7 +207,7 @@ class Capture:
             # Failed bridge never changes a normal response. Final requests are blocked above.
             report_drop(error)
             try:
-                await bridge_async("/event", lambda: {"type": "BRIDGE_FAILED", "detail": type(error).__name__})
+                await bridge_async("/event", lambda: {"type": "BRIDGE_FAILED", "detail": bridge_error_detail(error)})
             except Exception:
                 pass
 
